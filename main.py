@@ -44,3 +44,8 @@ def generate_cities(num_cities: int, margin: int = 45) -> List[Tuple[int, int]]:
         cities.append((x, y))
     return cities
 
+def create_pheromone_matrix(num_cities: int, initial_value: float = INITIAL_PHEROMONE) -> List[List[float]]:
+    """
+    Создаёт начальную матрицу феромонов, заполненную базовым значением.
+    """
+    return [[initial_value for _ in range(num_cities)] for _ in range(num_cities)]
