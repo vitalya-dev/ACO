@@ -44,8 +44,92 @@ def generate_cities(num_cities: int, margin: int = 45) -> List[Tuple[int, int]]:
         cities.append((x, y))
     return cities
 
+def compute_distance_matrix(cities: List[Tuple[int, int]]) -> List[List[float]]:
+    """
+    Вычисляет симметричную матрицу евклидовых расстояний между всеми парами городов.
+    """
+    n = len(cities)
+    matrix = [[0.0 for _ in range(n)] for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            dx = cities[i][0] - cities[j][0]
+            dy = cities[i][1] - cities[j][1]
+            dist = math.hypot(dx, dy)
+            # Защита от деления на ноль при совпадении координат
+            dist = max(dist, 1e-4)
+            matrix[i][j] = dist
+            matrix[j][i] = dist
+    return matrix
+
 def create_pheromone_matrix(num_cities: int, initial_value: float = INITIAL_PHEROMONE) -> List[List[float]]:
     """
     Создаёт начальную матрицу феромонов, заполненную базовым значением.
     """
     return [[initial_value for _ in range(num_cities)] for _ in range(num_cities)]
+
+
+def select_next_city(
+    current_city: int,
+    unvisited: List[int],
+    pheromones: List[List[float]],
+    distances: List[List[float]],
+    alpha: float = ALPHA,
+    beta: float = BETA
+) -> int:
+    """
+    Выбирает следующий город для муравья методом рулетки на основе
+    концентрации феромона (tau^alpha) и близости города (eta^beta).
+    """
+    weights = []
+    for city in unvisited:
+        tau = pheromones[current_city][city] ** alpha
+        eta = (1.0 / distances[current_city][city]) ** beta
+        weights.append(tau * eta)
+
+    total_weight = sum(weights)
+    if total_weight <= 0.0:
+        return random.choice(unvisited)
+
+    # Выбор методом рулетки (пропорционально весам)
+    return random.choices(unvisited, weights=weights, k=1)[0]
+
+
+def calculate_tour_length(tour: List[int], distances: List[List[float]]) -> float:
+    """
+    Вычисляет полную длину замкнутого маршрута коммивояжёра (включая возврат в старт).
+    """
+    total_dist = 0.0
+    n = len(tour)
+    for i in range(n):
+        u = tour[i]
+        v = tour[(i + 1) % n]
+        total_dist += distances[u][v]
+    return total_dist
+
+
+def construct_ant_tour(
+    num_cities: int,
+    pheromones: List[List[float]],
+    distances: List[List[float]],
+    alpha: float = ALPHA,
+    beta: float = BETA
+) -> Tuple[List[int], float]:
+    """
+    Моделирует проход одного муравья по всем городам графа.
+    Возвращает список индексов посещённых городов и итоговую длину тура.
+    """
+    start_city = random.randrange(num_cities)
+    tour = [start_city]
+    unvisited = [c for c in range(num_cities) if c != start_city]
+
+    current_city = start_city
+    while unvisited:
+        next_city = select_next_city(
+            current_city, unvisited, pheromones, distances, alpha, beta
+        )
+        tour.append(next_city)
+        unvisited.remove(next_city)
+        current_city = next_city
+
+    tour_length = calculate_tour_length(tour, distances)
+    return tour, tour_length
