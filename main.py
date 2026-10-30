@@ -133,3 +133,86 @@ def construct_ant_tour(
 
     tour_length = calculate_tour_length(tour, distances)
     return tour, tour_length
+
+
+def update_pheromones(
+    pheromones: List[List[float]],
+    all_tours: List[Tuple[List[int], float]],
+    best_tour: Optional[List[int]] = None,
+    best_length: float = float("inf"),
+    evaporation: float = EVAPORATION,
+    q: float = Q,
+    elitist_weight: float = ELITIST_WEIGHT
+) -> None:
+    """
+    Обновляет матрицу феромонов: сначала применяет глобальное испарение,
+    затем добавляет феромон от всех муравьёв текущей итерации и усиливает
+    лучший найденный за всё время маршрут (Elitist Ant System).
+    """
+    n = len(pheromones)
+
+    # 1. Испарение феромона на всех рёбрах
+    for i in range(n):
+        for j in range(n):
+            pheromones[i][j] = max(
+                MIN_PHEROMONE, pheromones[i][j] * (1.0 - evaporation)
+            )
+
+    # 2. Отложение феромона муравьями текущей популяции
+    for tour, length in all_tours:
+        deposit = q / length
+        for idx in range(n):
+            u = tour[idx]
+            v = tour[(idx + 1) % n]
+            pheromones[u][v] += deposit
+            pheromones[v][u] += deposit
+
+    # 3. Элитное усиление глобально лучшего маршрута
+    if best_tour is not None and best_length < float("inf"):
+        elite_deposit = (elitist_weight * q) / best_length
+        for idx in range(n):
+            u = best_tour[idx]
+            v = best_tour[(idx + 1) % n]
+            pheromones[u][v] += elite_deposit
+            pheromones[v][u] += elite_deposit
+
+def run_aco_iteration(
+    num_ants: int,
+    pheromones: List[List[float]],
+    distances: List[List[float]],
+    best_tour: Optional[List[int]],
+    best_length: float
+) -> Tuple[Optional[List[int]], float, List[int], float]:
+    """
+    Выполняет один полный цикл работы муравьиной колонии:
+    строит маршруты для всех муравьёв, находит лучший тур итерации,
+    обновляет глобальный рекорд и матрицу феромонов.
+    """
+    num_cities = len(distances)
+    all_tours: List[Tuple[List[int], float]] = []
+
+    iteration_best_tour: List[int] = []
+    iteration_best_length: float = float("inf")
+
+    for _ in range(num_ants):
+        tour, length = construct_ant_tour(num_cities, pheromones, distances)
+        all_tours.append((tour, length))
+
+        if length < iteration_best_length:
+            iteration_best_length = length
+            iteration_best_tour = tour
+
+    # Проверка и обновление глобального рекорда
+    if iteration_best_length < best_length:
+        best_length = iteration_best_length
+        best_tour = list(iteration_best_tour)
+
+    # Обновление феромонов на графе
+    update_pheromones(
+        pheromones=pheromones,
+        all_tours=all_tours,
+        best_tour=best_tour,
+        best_length=best_length
+    )
+
+    return best_tour, best_length, iteration_best_tour, iteration_best_length
